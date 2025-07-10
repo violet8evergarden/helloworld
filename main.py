@@ -20,7 +20,7 @@ ECHO = 24
 motor = Motor(AIN1, AIN2, PWMA, STBY)
 ultra = Ultrasonic(TRIG, ECHO)
 
-TARGET_HEIGHT_CM = 200
+TARGET_HEIGHT_CM = 100
 
 try:
     while True:
