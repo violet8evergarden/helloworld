@@ -1,49 +1,82 @@
 import RPi.GPIO as GPIO
 import time
 
-# TB6612 GPIO 引脚定义
-AIN1 = 17       # 电机方向 1
-AIN2 = 27       # 电机方向 2
-PWMA = 22       # PWM 控制速度
-STBY = 5        # 使能引脚
+# ---------------------------
+# GPIO 引脚定义
+# ---------------------------
+AIN1 = 17    # 电机A方向
+AIN2 = 27
+PWMA = 22
 
-# 初始化 GPIO
+BIN1 = 6     # 电机B方向
+BIN2 = 13
+PWMB = 19
+
+STBY = 5     # 使能引脚
+
+# ---------------------------
+# GPIO 初始化
+# ---------------------------
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
 
-GPIO.setup(AIN1, GPIO.OUT)
-GPIO.setup(AIN2, GPIO.OUT)
-GPIO.setup(PWMA, GPIO.OUT)
-GPIO.setup(STBY, GPIO.OUT)
+motor_pins = [AIN1, AIN2, PWMA, BIN1, BIN2, PWMB, STBY]
+for pin in motor_pins:
+    GPIO.setup(pin, GPIO.OUT)
 
-pwm = GPIO.PWM(PWMA, 1000)  # 1kHz PWM 频率
-pwm.start(0)
+pwm_a = GPIO.PWM(PWMA, 1000)
+pwm_b = GPIO.PWM(PWMB, 1000)
 
-# 启用驱动板
-GPIO.output(STBY, GPIO.HIGH)
+pwm_a.start(0)
+pwm_b.start(0)
 
-def motor_forward(speed=80):
+# ---------------------------
+# 电机控制函数
+# ---------------------------
+def enable_motor():
+    GPIO.output(STBY, GPIO.HIGH)
+
+def disable_motor():
+    GPIO.output(STBY, GPIO.LOW)
+
+def motor_a_forward(speed=80):
     GPIO.output(AIN1, GPIO.HIGH)
     GPIO.output(AIN2, GPIO.LOW)
-    pwm.ChangeDutyCycle(speed)
+    pwm_a.ChangeDutyCycle(speed)
 
-def motor_stop():
+def motor_b_forward(speed=80):
+    GPIO.output(BIN1, GPIO.HIGH)
+    GPIO.output(BIN2, GPIO.LOW)
+    pwm_b.ChangeDutyCycle(speed)
+
+def stop_all():
     GPIO.output(AIN1, GPIO.LOW)
     GPIO.output(AIN2, GPIO.LOW)
-    pwm.ChangeDutyCycle(0)
+    GPIO.output(BIN1, GPIO.LOW)
+    GPIO.output(BIN2, GPIO.LOW)
+    pwm_a.ChangeDutyCycle(0)
+    pwm_b.ChangeDutyCycle(0)
+    disable_motor()
 
+# ---------------------------
+# 主程序：两个电机正转 5 秒
+# ---------------------------
 try:
-    print("开始正转 50 秒")
-    motor_forward(speed=80)
-    time.sleep(50)
+    print("启动两个电机正转 5 秒")
+    enable_motor()
+    motor_a_forward(80)
+    motor_b_forward(80)
 
-    print("停止电机")
-    motor_stop()
+    time.sleep(5)
+
+    print("停止两个电机")
+    stop_all()
 
 except KeyboardInterrupt:
-    print("中断程序")
+    print("用户中断")
 
 finally:
-    motor_stop()
-    pwm.stop()
+    stop_all()
+    pwm_a.stop()
+    pwm_b.stop()
     GPIO.cleanup()
