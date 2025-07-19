@@ -1,61 +1,57 @@
 import RPi.GPIO as GPIO
 import time
 
-# 电机控制引脚映射表
-MOTORS = {
-    "A": {"IN1": 17, "IN2": 27, "PWM": 22},
-    "B": {"IN1": 6,  "IN2": 13, "PWM": 19},
-    "C": {"IN1": 16, "IN2": 20, "PWM": 21},
-    "D": {"IN1": 23, "IN2": 24, "PWM": 25},
-}
-
-STBY_A = 5
-STBY_B = 12
+# 设置引脚映射（BCM 模式）
+MotorA = {"IN1": 17, "IN2": 27, "PWM": 22}
+MotorB = {"IN1": 6,  "IN2": 13, "PWM": 19}
+STBY = 5
 
 def setup():
     GPIO.setmode(GPIO.BCM)
-    for m in MOTORS.values():
-        GPIO.setup(m["IN1"], GPIO.OUT)
-        GPIO.setup(m["IN2"], GPIO.OUT)
-        GPIO.setup(m["PWM"], GPIO.OUT)
-    GPIO.setup(STBY_A, GPIO.OUT)
-    GPIO.setup(STBY_B, GPIO.OUT)
+    pins = list(MotorA.values()) + list(MotorB.values()) + [STBY]
+    for pin in pins:
+        GPIO.setup(pin, GPIO.OUT)
 
-    global PWMS
-    PWMS = {name: GPIO.PWM(cfg["PWM"], 1000) for name, cfg in MOTORS.items()}
-    for pwm in PWMS.values():
-        pwm.start(0)
+    # 启动 PWM
+    global pwmA, pwmB
+    pwmA = GPIO.PWM(MotorA["PWM"], 1000)  # 1kHz
+    pwmB = GPIO.PWM(MotorB["PWM"], 1000)
+    pwmA.start(0)
+    pwmB.start(0)
 
-def run_motor(name, speed=100):
-    cfg = MOTORS[name]
-    GPIO.output(cfg["IN1"], GPIO.HIGH)
-    GPIO.output(cfg["IN2"], GPIO.LOW)
-    PWMS[name].ChangeDutyCycle(speed)
+def run_motor(motor, speed=100):
+    GPIO.output(motor["IN1"], GPIO.HIGH)
+    GPIO.output(motor["IN2"], GPIO.LOW)
+    if motor == MotorA:
+        pwmA.ChangeDutyCycle(speed)
+    else:
+        pwmB.ChangeDutyCycle(speed)
 
-def stop_motor(name):
-    cfg = MOTORS[name]
-    GPIO.output(cfg["IN1"], GPIO.LOW)
-    GPIO.output(cfg["IN2"], GPIO.LOW)
-    PWMS[name].ChangeDutyCycle(0)
+def stop_motor(motor):
+    GPIO.output(motor["IN1"], GPIO.LOW)
+    GPIO.output(motor["IN2"], GPIO.LOW)
+    if motor == MotorA:
+        pwmA.ChangeDutyCycle(0)
+    else:
+        pwmB.ChangeDutyCycle(0)
 
 def main():
     setup()
-    GPIO.output(STBY_A, GPIO.HIGH)
-    GPIO.output(STBY_B, GPIO.HIGH)
+    GPIO.output(STBY, GPIO.HIGH)  # 使能 TB6612
 
-    print("All motors running forward...")
-    for name in MOTORS:
-        run_motor(name)
+    print("Motor A and B running...")
+    run_motor(MotorA, speed=80)
+    run_motor(MotorB, speed=80)
 
     time.sleep(5)
 
-    print("All motors stopping...")
-    for name in MOTORS:
-        stop_motor(name)
+    print("Stopping motors...")
+    stop_motor(MotorA)
+    stop_motor(MotorB)
 
-    for pwm in PWMS.values():
-        pwm.stop()
+    pwmA.stop()
+    pwmB.stop()
     GPIO.cleanup()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
