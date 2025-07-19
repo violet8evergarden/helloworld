@@ -1,82 +1,61 @@
 import RPi.GPIO as GPIO
 import time
 
-# ---------------------------
-# GPIO 引脚定义
-# ---------------------------
-AIN1 = 17    # 电机A方向
-AIN2 = 27
-PWMA = 22
+# 电机控制引脚映射表
+MOTORS = {
+    "A": {"IN1": 17, "IN2": 27, "PWM": 22},
+    "B": {"IN1": 6,  "IN2": 13, "PWM": 19},
+    "C": {"IN1": 16, "IN2": 20, "PWM": 21},
+    "D": {"IN1": 23, "IN2": 24, "PWM": 25},
+}
 
-BIN1 = 6     # 电机B方向
-BIN2 = 13
-PWMB = 19
+STBY_A = 5
+STBY_B = 12
 
-STBY = 5     # 使能引脚
+def setup():
+    GPIO.setmode(GPIO.BCM)
+    for m in MOTORS.values():
+        GPIO.setup(m["IN1"], GPIO.OUT)
+        GPIO.setup(m["IN2"], GPIO.OUT)
+        GPIO.setup(m["PWM"], GPIO.OUT)
+    GPIO.setup(STBY_A, GPIO.OUT)
+    GPIO.setup(STBY_B, GPIO.OUT)
 
-# ---------------------------
-# GPIO 初始化
-# ---------------------------
-GPIO.setmode(GPIO.BCM)
-GPIO.setwarnings(False)
+    global PWMS
+    PWMS = {name: GPIO.PWM(cfg["PWM"], 1000) for name, cfg in MOTORS.items()}
+    for pwm in PWMS.values():
+        pwm.start(0)
 
-motor_pins = [AIN1, AIN2, PWMA, BIN1, BIN2, PWMB, STBY]
-for pin in motor_pins:
-    GPIO.setup(pin, GPIO.OUT)
+def run_motor(name, speed=100):
+    cfg = MOTORS[name]
+    GPIO.output(cfg["IN1"], GPIO.HIGH)
+    GPIO.output(cfg["IN2"], GPIO.LOW)
+    PWMS[name].ChangeDutyCycle(speed)
 
-pwm_a = GPIO.PWM(PWMA, 1000)
-pwm_b = GPIO.PWM(PWMB, 1000)
+def stop_motor(name):
+    cfg = MOTORS[name]
+    GPIO.output(cfg["IN1"], GPIO.LOW)
+    GPIO.output(cfg["IN2"], GPIO.LOW)
+    PWMS[name].ChangeDutyCycle(0)
 
-pwm_a.start(0)
-pwm_b.start(0)
+def main():
+    setup()
+    GPIO.output(STBY_A, GPIO.HIGH)
+    GPIO.output(STBY_B, GPIO.HIGH)
 
-# ---------------------------
-# 电机控制函数
-# ---------------------------
-def enable_motor():
-    GPIO.output(STBY, GPIO.HIGH)
-
-def disable_motor():
-    GPIO.output(STBY, GPIO.LOW)
-
-def motor_a_forward(speed=80):
-    GPIO.output(AIN1, GPIO.HIGH)
-    GPIO.output(AIN2, GPIO.LOW)
-    pwm_a.ChangeDutyCycle(speed)
-
-def motor_b_forward(speed=80):
-    GPIO.output(BIN1, GPIO.HIGH)
-    GPIO.output(BIN2, GPIO.LOW)
-    pwm_b.ChangeDutyCycle(speed)
-
-def stop_all():
-    GPIO.output(AIN1, GPIO.LOW)
-    GPIO.output(AIN2, GPIO.LOW)
-    GPIO.output(BIN1, GPIO.LOW)
-    GPIO.output(BIN2, GPIO.LOW)
-    pwm_a.ChangeDutyCycle(0)
-    pwm_b.ChangeDutyCycle(0)
-    disable_motor()
-
-# ---------------------------
-# 主程序：两个电机正转 5 秒
-# ---------------------------
-try:
-    print("启动两个电机正转 5 秒")
-    enable_motor()
-    motor_a_forward(80)
-    motor_b_forward(80)
+    print("All motors running forward...")
+    for name in MOTORS:
+        run_motor(name)
 
     time.sleep(5)
 
-    print("停止两个电机")
-    stop_all()
+    print("All motors stopping...")
+    for name in MOTORS:
+        stop_motor(name)
 
-except KeyboardInterrupt:
-    print("用户中断")
-
-finally:
-    stop_all()
-    pwm_a.stop()
-    pwm_b.stop()
+    for pwm in PWMS.values():
+        pwm.stop()
     GPIO.cleanup()
+
+if __name__ == "__main__":
+    main()
