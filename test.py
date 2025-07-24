@@ -1,52 +1,49 @@
 import RPi.GPIO as GPIO
 import time
 
-# 电机引脚定义
-MOTOR_A = {'IN1': 17, 'IN2': 27, 'ENA': 22}
-MOTOR_B = {'IN1': 6,  'IN2': 13, 'ENA': 19}
+# 电机控制引脚
+MOTORS = {
+    "A": {"IN1": 17, "IN2": 27, "PWM": 22},
+    "B": {"IN1": 5,  "IN2": 6,  "PWM": 13},
+}
 
-# PWM 频率
-PWM_FREQ = 1000
-
-def setup_motor_pins(motor):
-    GPIO.setup(motor['IN1'], GPIO.OUT)
-    GPIO.setup(motor['IN2'], GPIO.OUT)
-    GPIO.setup(motor['ENA'], GPIO.OUT)
-    pwm = GPIO.PWM(motor['ENA'], PWM_FREQ)
-    pwm.start(0)
-    return pwm
-
-def run_motor_forward(motor, pwm, speed=100):
-    GPIO.output(motor['IN1'], GPIO.HIGH)
-    GPIO.output(motor['IN2'], GPIO.LOW)
-    pwm.ChangeDutyCycle(speed)
-
-def stop_motor(motor, pwm):
-    GPIO.output(motor['IN1'], GPIO.LOW)
-    GPIO.output(motor['IN2'], GPIO.LOW)
-    pwm.ChangeDutyCycle(0)
-
-def main():
+def setup():
     GPIO.setmode(GPIO.BCM)
-    GPIO.setwarnings(False)
+    for m in MOTORS.values():
+        GPIO.setup(m["IN1"], GPIO.OUT)
+        GPIO.setup(m["IN2"], GPIO.OUT)
+        GPIO.setup(m["PWM"], GPIO.OUT)
+        m["pwm"] = GPIO.PWM(m["PWM"], 1000)  # 1kHz PWM
+        m["pwm"].start(0)
 
-    # 设置电机引脚
-    pwm_a = setup_motor_pins(MOTOR_A)
-    pwm_b = setup_motor_pins(MOTOR_B)
+def move_motor(name, speed, direction):
+    m = MOTORS[name]
+    GPIO.output(m["IN1"], GPIO.HIGH if direction == "forward" else GPIO.LOW)
+    GPIO.output(m["IN2"], GPIO.LOW if direction == "forward" else GPIO.HIGH)
+    m["pwm"].ChangeDutyCycle(speed)
 
-    print("Running motors forward for 5 seconds...")
-    run_motor_forward(MOTOR_A, pwm_a)
-    run_motor_forward(MOTOR_B, pwm_b)
+def stop_motor(name):
+    m = MOTORS[name]
+    m["pwm"].ChangeDutyCycle(0)
+    GPIO.output(m["IN1"], GPIO.LOW)
+    GPIO.output(m["IN2"], GPIO.LOW)
 
-    time.sleep(5)
-
-    print("Stopping motors.")
-    stop_motor(MOTOR_A, pwm_a)
-    stop_motor(MOTOR_B, pwm_b)
-
-    pwm_a.stop()
-    pwm_b.stop()
+def cleanup():
+    for m in MOTORS.values():
+        m["pwm"].stop()
     GPIO.cleanup()
 
 if __name__ == "__main__":
-    main()
+    try:
+        setup()
+        print("Motor A forward 70%")
+        move_motor("A", 70, "forward")
+        print("Motor B backward 50%")
+        move_motor("B", 50, "backward")
+        time.sleep(5)
+
+        print("Stopping motors")
+        stop_motor("A")
+        stop_motor("B")
+    finally:
+        cleanup()
